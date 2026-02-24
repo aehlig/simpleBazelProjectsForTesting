@@ -1,4 +1,4 @@
-load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@my_protobuf//bazel:proto_library.bzl", "proto_library")
 
 java_proto_library(
     name = "lib_b_java",
