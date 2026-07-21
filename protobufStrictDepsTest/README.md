@@ -28,7 +28,7 @@ proto/
 
 ```
 scala_binary (//app:app)
-  → scala_proto_library (//proto/requests:requests_scala_proto)
+  → scala_proto_library (//proto/requests/scala:requests_scala_proto)
     → proto_library (//proto/requests:requests_proto)
       → proto_library (//proto/common:common_proto)  ← transitive dependency
 ```

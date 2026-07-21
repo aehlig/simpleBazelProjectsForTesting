@@ -3,6 +3,7 @@ module(
     version = "0.0.1",
 )
 
+bazel_dep(name = "platforms", version = "0.0.11")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "protobuf", version = "33.1")
 bazel_dep(name = "rules_scala", version = "7.1.5")

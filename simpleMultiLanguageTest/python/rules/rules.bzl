@@ -56,18 +56,38 @@ EOF
 main "$@"
 """
 
+_GENERATED_DIRECTORY_CONTENT = """\
+PLASTICS = ["Bakerlite", "Polyethylene", "Nylon"]
+
+
+def print_plastics():
+    for plastic in PLASTICS:
+        print(f"# {plastic} Plastic")
+"""
+
 def _test_codegen_directory_py_impl(ctx):
-    output_directory = ctx.actions.declare_directory("materials")
-    script_file = ctx.actions.declare_file("make_py.sh")
+    if ctx.attr.generate_with_shell_script:
+        output_directory = ctx.actions.declare_directory("materials")
+        script_file = ctx.actions.declare_file("make_py.sh")
 
-    ctx.actions.write(output = script_file, content = _SCRIPT_GENERATE_DIRECTORY)
+        ctx.actions.write(output = script_file, content = _SCRIPT_GENERATE_DIRECTORY)
 
-    ctx.actions.run(
-        mnemonic = "TestCodeGenDirectoryPy",
-        executable = script_file,
-        arguments = [ctx.actions.args().add(output_directory.path)],
-        outputs = [output_directory],
-    )
+        ctx.actions.run(
+            mnemonic = "TestCodeGenDirectoryPy",
+            executable = script_file,
+            arguments = [ctx.actions.args().add(output_directory.path)],
+            outputs = [output_directory],
+        )
+
+        outputs = [output_directory]
+    else:
+        plastics = ctx.actions.declare_file("materials/artificial/plastics.py")
+        artificial_init = ctx.actions.declare_file("materials/artificial/__init__.py")
+        materials_init = ctx.actions.declare_file("materials/__init__.py")
+        outputs = [plastics, artificial_init, materials_init]
+        ctx.actions.write(output = plastics, content = _GENERATED_DIRECTORY_CONTENT)
+        ctx.actions.write(output = artificial_init, content = "")
+        ctx.actions.write(output = materials_init, content = "")
 
     # This would ideally use some normalized path handling here, but it is done here
     # manually assuming a *NIX style system to reduce the complexity of the example.
@@ -80,11 +100,11 @@ def _test_codegen_directory_py_impl(ctx):
 
     return [
         DefaultInfo(
-            runfiles = ctx.runfiles([output_directory]),
-            files = depset([output_directory]),
+            runfiles = ctx.runfiles(files = outputs),
+            files = depset(outputs),
         ),
         RulesPythonPyInfo(
-            transitive_sources = depset([output_directory]),
+            transitive_sources = depset(outputs),
             imports = depset([imports_path]),
         ),
     ]
@@ -126,6 +146,11 @@ def _test_codegen_files_py_impl(ctx):
 
 test_codegen_directory_py = rule(
     implementation = _test_codegen_directory_py_impl,
+    attrs = {
+        # The directory-generating script action needs bash, which Windows agents
+        # lack; the plain-file mode writes equivalent sources without a directory output.
+        "generate_with_shell_script": attr.bool(default = True),
+    },
     provides = [DefaultInfo, RulesPythonPyInfo],
     doc = """\
     Produces a Python code-generation library to demonstrate production of a directory of files.

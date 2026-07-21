@@ -8,6 +8,9 @@ java_library(
     deps = [
         "//proto/requests:requests_java_proto",
 #         "//proto/common:common_java_proto",
-        "@maven//:com_google_protobuf_protobuf_java",
-    ],
+    ] + select({
+        # The Windows fixture variant drops rules_jvm_external, so there is no @maven there.
+        "@platforms//os:windows": ["@protobuf//:protobuf_java"],
+        "//conditions:default": ["@maven//:com_google_protobuf_protobuf_java"],
+    }),
 )

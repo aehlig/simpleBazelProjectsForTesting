@@ -5,6 +5,6 @@ scala_binary(
     srcs = ["Main.scala"],
     main_class = "com.example.Main",
     deps = [
-        "//proto/requests:requests_scala_proto",
+        "//proto/requests/scala:requests_scala_proto",
     ],
 )
