@@ -13,10 +13,19 @@ import org.junit.platform.launcher.TestPlan;
 import org.opentest4j.AssertionFailedError;
 import org.opentest4j.MultipleFailuresError;
 
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Lightweight IntelliJ Service Messages emitter for JUnit 5 execution.
@@ -112,17 +121,16 @@ public final class IjSmTestExecutionListener implements TestExecutionListener {
 
   @Override
   public void executionSkipped(TestIdentifier testIdentifier, String reason) {
+    // IDEA needs a matching executionStarted event first for skipped tests to show up in the UI
+    executionStarted(testIdentifier);
     if (testIdentifier.isTest()) {
       Map<String, String> attrs = baseAttrs(testIdentifier);
-      if (reason != null && !reason.isEmpty()) attrs.put("message", reason);
+      attrs.put("message", reason != null ? reason : "");
       serviceMessage("testIgnored", attrs);
     } else if (testIdentifier.isContainer()) {
-      // Emit started/ignored/finished trio for skipped containers to show up in UI
-      executionStarted(testIdentifier);
       Map<String, String> attrs = baseAttrs(testIdentifier);
-      if (reason != null && !reason.isEmpty()) attrs.put("message", reason);
+      attrs.put("message", reason != null ? reason : "");
       serviceMessage("testIgnored", attrs);
-      executionFinished(testIdentifier, TestExecutionResult.successful());
     }
   }
 
@@ -133,7 +141,7 @@ public final class IjSmTestExecutionListener implements TestExecutionListener {
       // If container failed/aborted, report a synthetic failure test under the suite
       Optional<Throwable> throwable = testExecutionResult.getThrowable();
       if ((testExecutionResult.getStatus() == TestExecutionResult.Status.FAILED
-           || testExecutionResult.getStatus() == TestExecutionResult.Status.ABORTED) && throwable.isPresent()) {
+              || testExecutionResult.getStatus() == TestExecutionResult.Status.ABORTED) && throwable.isPresent()) {
         String syntheticId = id + "/[suite-setup]";
         String parentId = id;
         String suiteSetupName = "<suite setup>";
@@ -152,7 +160,7 @@ public final class IjSmTestExecutionListener implements TestExecutionListener {
         fail.put("nodeId", syntheticId);
         fail.put("parentNodeId", parentId);
         String msg = t.getMessage();
-        if (msg != null && !msg.isEmpty()) fail.put("message", msg);
+        fail.put("message", msg != null ? msg : "");
         fail.put("details", stackTraceToString(t));
         serviceMessage("testFailed", fail);
 
@@ -182,7 +190,7 @@ public final class IjSmTestExecutionListener implements TestExecutionListener {
           for (Throwable sub : ((MultipleFailuresError) t).getFailures()) {
             Map<String, String> fail = baseAttrs(testIdentifier);
             String message = sub.getMessage();
-            if (message != null && !message.isEmpty()) fail.put("message", message);
+            fail.put("message", message != null ? message : "");
             if (sub instanceof AssertionFailedError) {
               AssertionFailedError afe = (AssertionFailedError) sub;
               if (afe.isExpectedDefined() || afe.isActualDefined()) {
@@ -199,7 +207,7 @@ public final class IjSmTestExecutionListener implements TestExecutionListener {
         } else {
           Map<String, String> fail = baseAttrs(testIdentifier);
           String message = t.getMessage();
-          if (message != null && !message.isEmpty()) fail.put("message", message);
+          fail.put("message", message != null ? message : "");  // required parameter
           if (t instanceof AssertionFailedError) {
             AssertionFailedError afe = (AssertionFailedError) t;
             if (afe.isExpectedDefined() || afe.isActualDefined()) {
@@ -334,7 +342,7 @@ public final class IjSmTestExecutionListener implements TestExecutionListener {
     return sb.toString();
   }
 
-  private static String firstNonEmpty(Map<String, String> map, List<String> keys) {
+  private static String firstNonEmpty(Map<String, String> map, java.util.List<String> keys) {
     for (String k : keys) {
       String v = map.get(k);
       if (v != null && !v.isEmpty()) return v;
@@ -402,7 +410,7 @@ public final class IjSmTestExecutionListener implements TestExecutionListener {
     String parent = deriveParentIdFromUniqueId(nodeId);
     if (parent != null && !parent.isEmpty()) attrs.put("parentNodeId", parent);
     return attrs;
-    }
+  }
 
   private static String deriveNameFromUniqueId(String uid) {
     if (uid == null || uid.isEmpty()) return "unknown";
@@ -427,7 +435,7 @@ public final class IjSmTestExecutionListener implements TestExecutionListener {
   private static String deriveParentIdFromUniqueId(String uid) {
     if (uid == null) return null;
     int slash = uid.lastIndexOf('/')
-;    if (slash < 0) return null;
+            ;    if (slash < 0) return null;
     return uid.substring(0, slash);
   }
 
@@ -516,7 +524,10 @@ public final class IjSmTestExecutionListener implements TestExecutionListener {
     private final ThreadLocal<StringBuilder> buffer = ThreadLocal.withInitial(StringBuilder::new);
 
     private CapturingPrintStream(PrintStream original, boolean isErr, IjSmTestExecutionListener owner) {
-      super(new java.io.OutputStream() { public void write(int b) {} }, true);
+      super(new OutputStream() {
+        @Override
+        public void write(int b) { }
+      }, true);
       this.original = original;
       this.isErr = isErr;
       this.owner = owner;
