@@ -5,3 +5,4 @@ build:macos --extra_toolchains=@zig_sdk//toolchain:darwin_amd64 --extra_toolchai
 
 build:windows --cxxopt=/std:c++17
 build:windows --host_cxxopt=/std:c++17
+try-import %workspace%/user.bazelrc
