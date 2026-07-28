@@ -1,4 +1,4 @@
-package case1;
+package mixedSources;
 
 import org.junit.Test;
 import org.junit.Assert;
