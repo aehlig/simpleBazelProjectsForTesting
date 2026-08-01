@@ -34,6 +34,7 @@ public final class JUnit5BazelRunner {
   private static final int EXIT_CODE_TEST_FAILURE_OOM = 137;
 
   private static final String bazelEnvSelfLocation = "SELF_LOCATION";
+  private static final String bazelEnvRunfilesManifestOnly = "RUNFILES_MANIFEST_ONLY";
   private static final String bazelEnvTestTmpDir = "TEST_TMPDIR";
   private static final String bazelEnvRunFilesDir = "RUNFILES_DIR";
   private static final String bazelEnvJavaRunFilesDir = "JAVA_RUNFILES";
@@ -81,9 +82,10 @@ public final class JUnit5BazelRunner {
     try {
       System.err.println("Running tests via " + JUnit5BazelRunner.class.getName());
 
-      var isBazelTestRun = isBazelTestRun();
-      if (!isBazelTestRun) {
-        throw new RuntimeException("Missing expected env variable in bazel test environment.");
+      var missingBazelTestEnv = missingBazelTestEnv();
+      if (!missingBazelTestEnv.isEmpty()) {
+        throw new RuntimeException(
+                "Missing expected env variable in bazel test environment: " + String.join(", ", missingBazelTestEnv));
       }
 
       String bazelTestTestSrcDir = System.getenv(bazelEnvTestSrcDir);
@@ -399,12 +401,24 @@ public final class JUnit5BazelRunner {
     return path.toAbsolutePath();
   }
 
-  private static Boolean isBazelTestRun() {
-    return Stream.of(bazelEnvSelfLocation, bazelEnvTestTmpDir, bazelEnvRunFilesDir, bazelEnvJavaRunFilesDir)
-            .allMatch(bazelTestEnv -> {
-              var bazelTestEnvValue = System.getenv(bazelTestEnv);
-              return bazelTestEnvValue != null && !bazelTestEnvValue.isBlank();
-            });
+  private static boolean isBlankEnv(String name) {
+    var value = System.getenv(name);
+    return value == null || value.isBlank();
+  }
+
+  // Mirrors com.intellij.tests.JUnit5BazelRunner. SELF_LOCATION is exported by the Bash stub
+  // launcher, so it is absent on Windows, where rules_kotlin builds a native .exe launcher and
+  // Bazel uses manifest-based runfiles; RUNFILES_MANIFEST_ONLY stands in for it there.
+  // Returns the missing variables so the failure names them instead of just saying "some".
+  private static List<String> missingBazelTestEnv() {
+    var missing = new ArrayList<String>();
+    Stream.of(bazelEnvTestTmpDir, bazelEnvRunFilesDir, bazelEnvJavaRunFilesDir)
+            .filter(JUnit5BazelRunner::isBlankEnv)
+            .forEach(missing::add);
+    if (isBlankEnv(bazelEnvSelfLocation) && isBlankEnv(bazelEnvRunfilesManifestOnly)) {
+      missing.add(bazelEnvSelfLocation + " or " + bazelEnvRunfilesManifestOnly);
+    }
+    return missing;
   }
 
   private static void setBazelSandboxPaths(Path ideaHomePath, Path tempDir) throws IOException {
